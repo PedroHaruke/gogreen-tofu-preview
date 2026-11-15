@@ -39,6 +39,12 @@ hero.innerHTML=`<svg class="hero" viewBox="0 0 500 440" role="img" aria-label="T
 <g id="leafL"><path d="M3 -7 C-38 -2 -63 -35 -57 -67 C-21 -72 10 -45 3 -7Z" fill="url(#leaf)"/><path d="M1 -10 Q-19 -37 -45 -55" stroke="#338437" stroke-width="2.5" fill="none"/><path d="M-46 -60 Q-26 -58 -15 -43" stroke="#d6f994" opacity=".55" stroke-width="5" fill="none" stroke-linecap="round"/></g>
 <g id="leafR"><path d="M3 -9 C-1 -49 29 -80 64 -72 C70 -38 43 -7 3 -9Z" fill="url(#leaf)"/><path d="M7 -14 Q32 -46 54 -60" stroke="#338437" stroke-width="2.5" fill="none"/><path d="M21 -52 Q37 -68 54 -65" stroke="#d6f994" opacity=".6" stroke-width="5" fill="none" stroke-linecap="round"/></g><path d="M7 -28 Q-5 -49 9 -56 Q25 -47 7 -28" fill="#7ccc43"/></g></g></g>
 </svg>`;
+// Palette matched to the original loading asset; no geometry or timing changes.
+const tofuPalette={cream:'#fff2d5',creamLight:'#fff6e1',creamShade:'#ffedca',sideLight:'#ffe7bc',sideShade:'#ffdda6',pore:'#ffcc7e',leafLight:'#80d51b',leafMain:'#60c400',leafShade:'#50af00',vein:'#368b08',cheek:'#ff5263',ink:'#100d09'};
+const paintMap={'#fffde9':tofuPalette.creamLight,'#fff1b5':tofuPalette.cream,'#eacb7c':tofuPalette.creamShade,'#f4d58c':tofuPalette.sideLight,'#d7ad58':tofuPalette.sideShade,'#fffff1':'#fff6e3','#f9e8b1':'#ffebc6','#a7e854':tofuPalette.leafLight,'#63bf32':tofuPalette.leafMain,'#23813b':tofuPalette.leafShade,'#338437':tofuPalette.vein,'#408a35':tofuPalette.vein,'#d6f994':'#a0e73c','#7ccc43':'#a0e52d','#d8b967':tofuPalette.pore,'#554334':'#19130d','#231f1a':tofuPalette.ink,'#433525':tofuPalette.ink,'#59422b':tofuPalette.ink,'#ef8c76':tofuPalette.cheek,'#efa382':tofuPalette.cheek};
+hero.querySelectorAll('*').forEach(node=>['fill','stroke','stop-color'].forEach(attr=>{const value=node.getAttribute(attr);if(paintMap[value])node.setAttribute(attr,paintMap[value])}));
+hero.querySelector(`g[fill="${tofuPalette.pore}"]`).setAttribute('opacity','.85');
+hero.querySelectorAll('#blush stop').forEach((stop,i)=>{stop.setAttribute('stop-opacity',i?'.75':'.95')});
 const ids=['body','shadow','legL','legR','footL','footR','armL','armR','handL','handR','sprout','leafL','leafR','face','eyes','happy','mouth','openMouth'];const el=Object.fromEntries(ids.map(id=>[id,document.getElementById(id)]));
 const particleGroup=$('#particles'),particles=Array.from({length:20},(_,i)=>{const n=document.createElementNS('http://www.w3.org/2000/svg','rect');n.setAttribute('width',i%3===0?5:8);n.setAttribute('height',i%3===0?9:4);n.setAttribute('rx','2');n.setAttribute('fill',['#78b94b','#e0b651','#b5d481','#7ac4bf'][i%4]);particleGroup.append(n);return n});
 let mode=0,time=0,last=0,paused=false,speed=1,gaze={x:0,y:0},pose={};const reduced=matchMedia('(prefers-reduced-motion: reduce)');
@@ -59,7 +65,7 @@ rightShoulder.setAttribute('transform','translate(326 232)');
 el.body.insertBefore(leftShoulder,rightShoulder);
 for(const id of ['armL','armR','legL','legR']){
  const arm=id.startsWith('arm'),side=id.endsWith('L')?-1:1;
- el[id].innerHTML=`<path class="skin" fill="none" stroke="${arm?'#f3dfa6':'#eddaa4'}" stroke-width="${arm?rigSpec.armWidth:rigSpec.legWidth}" stroke-linecap="round" stroke-linejoin="round"/><g class="tip"><ellipse rx="${arm?11:15}" ry="${arm?10:9}" cx="${arm?0:side*4}" fill="#fff0c7"/>${arm?`<ellipse cx="${-side*6}" cy="-5" rx="5" ry="6" fill="#fff0c7"/>`:''}</g>`;
+ el[id].innerHTML=`<path class="skin" fill="none" stroke="${tofuPalette.creamShade}" stroke-width="${arm?rigSpec.armWidth:rigSpec.legWidth}" stroke-linecap="round" stroke-linejoin="round"/><g class="tip"><ellipse rx="${arm?11:15}" ry="${arm?10:9}" cx="${arm?0:side*4}" fill="${tofuPalette.creamShade}"/>${arm?`<ellipse cx="${-side*6}" cy="-5" rx="5" ry="6" fill="${tofuPalette.creamShade}"/>`:''}</g>`;
  rigs[id]={skin:el[id].querySelector('.skin'),tip:el[id].querySelector('.tip')};
 }
 function skin(id,joint,end,tipAngle){
