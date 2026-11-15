@@ -51,6 +51,12 @@ const set=(id,v)=>el[id].setAttribute('transform',v),rotate=(id,a)=>set(id,`rota
 // One continuous skin curve per limb: no independently rotating cut-out pieces.
 const rigSpec={upperArm:24,forearm:23,thigh:26,shin:27,armWidth:18,legWidth:19,stepPeriod:1.05,blendRate:9};
 const rigs={};
+// Bury both shoulder roots beneath the body paint. The visible skin must
+// emerge from its contour, never start with a round cap pasted on the face.
+const leftShoulder=el.armL.parentNode,rightShoulder=el.armR.parentNode;
+leftShoulder.setAttribute('transform','translate(184 232)');
+rightShoulder.setAttribute('transform','translate(326 232)');
+el.body.insertBefore(leftShoulder,rightShoulder);
 for(const id of ['armL','armR','legL','legR']){
  const arm=id.startsWith('arm'),side=id.endsWith('L')?-1:1;
  el[id].innerHTML=`<path class="skin" fill="none" stroke="${arm?'#f3dfa6':'#eddaa4'}" stroke-width="${arm?rigSpec.armWidth:rigSpec.legWidth}" stroke-linecap="round" stroke-linejoin="round"/><g class="tip"><ellipse rx="${arm?11:15}" ry="${arm?10:9}" cx="${arm?0:side*4}" fill="#fff0c7"/>${arm?`<ellipse cx="${-side*6}" cy="-5" rx="5" ry="6" fill="#fff0c7"/>`:''}</g>`;
@@ -59,10 +65,11 @@ for(const id of ['armL','armR','legL','legR']){
 function skin(id,joint,end,tipAngle){
  const {skin,tip}=rigs[id];el[id].removeAttribute('transform');
  // Cubic tangent passes through the elbow/knee region with no visible hinge seam.
- skin.setAttribute('d',`M0 0 C${joint.x*.72} ${joint.y*.72} ${joint.x} ${joint.y} ${(joint.x+end.x)*.5} ${(joint.y+end.y)*.5} Q${end.x} ${end.y} ${end.x} ${end.y}`);
+ const shoulder=id.startsWith('arm')?(id.endsWith('L')?-20:20):joint.x*.72;
+ skin.setAttribute('d',`M0 0 C${shoulder} ${id.startsWith('arm')?0:joint.y*.72} ${joint.x} ${joint.y} ${(joint.x+end.x)*.5} ${(joint.y+end.y)*.5} Q${end.x} ${end.y} ${end.x} ${end.y}`);
  tip.setAttribute('transform',`translate(${end.x} ${end.y}) rotate(${tipAngle})`);
 }
-function arm(id,shoulder,bend){const r=Math.PI/180,a=shoulder*r,b=(shoulder+bend)*r,j={x:Math.sin(a)*rigSpec.upperArm,y:Math.cos(a)*rigSpec.upperArm},e={x:j.x+Math.sin(b)*rigSpec.forearm,y:j.y+Math.cos(b)*rigSpec.forearm};skin(id,j,e,-(shoulder+bend)*.6)}
+function arm(id,shoulder,bend){const side=id.endsWith('L')?-1:1,r=Math.PI/180,a=shoulder*r,b=(shoulder+bend)*r,j={x:side*(20+Math.sin(a)**2*16),y:Math.cos(a)*rigSpec.upperArm},e={x:side*(36+12*Math.sin(side*b)),y:j.y+Math.cos(b)*rigSpec.forearm};skin(id,j,e,-(shoulder+bend)*.6)}
 function leg(id,x,y,roll){const len=Math.hypot(x,y),d=Math.min(rigSpec.thigh+rigSpec.shin-.5,Math.max(8,len)),ux=x/len,uy=y/len,h=(rigSpec.thigh**2-rigSpec.shin**2+d*d)/(2*d),off=Math.sqrt(Math.max(0,rigSpec.thigh**2-h*h));skin(id,{x:ux*h-uy*off,y:uy*h+ux*off},{x:ux*d,y:uy*d},roll)}
 function render(dt){const t=reduced.matches?.35:time, p=t*Math.PI*2, s=Math.sin(p*1.6),c=Math.cos(p*1.6);let a={y:-3*Math.sin(p*.55),angle:0,sx:1,sy:1,ll:0,lr:0,fl:0,fr:0,al:-5,ar:5,hl:0,hr:0,leaf:3*Math.sin(p*.75),joy:0};
 if(mode===0){const stride=p/rigSpec.stepPeriod,bounce=(1-Math.cos(stride*2))*.5;a={...a,y:-4-bounce*7,angle:-2+1.6*Math.sin(stride),sx:1.015-bounce*.025,sy:.985+bounce*.03,al:-22-24*Math.sin(stride),ar:22+24*Math.sin(stride),hl:-26-10*Math.sin(stride-.65),hr:26+10*Math.sin(stride-.65),leaf:5*Math.sin(stride*2-.8)}}
