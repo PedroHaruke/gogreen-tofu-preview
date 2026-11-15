@@ -48,17 +48,37 @@ $('#theme').onclick=()=>{const dark=document.body.classList.toggle('dark');$('#t
 $('#pause').onclick=()=>{paused=!paused;document.body.classList.toggle('paused',paused);$('#pause').textContent=paused?'Continuar':'Pausar';$('#pause').setAttribute('aria-pressed',paused);$('#status').textContent=reduced.matches?'Movimento reduzido':paused?'Pausado':'Em movimento'};$('#speed').onchange=e=>speed=+e.target.value;$('#replay').onclick=()=>{time=0;pose={};render(1)};
 $('.stage').onpointermove=e=>{const r=$('.stage').getBoundingClientRect();gaze={x:((e.clientX-r.left)/r.width-.5)*6,y:((e.clientY-r.top)/r.height-.5)*4}};$('.stage').onpointerleave=()=>gaze={x:0,y:0};
 const set=(id,v)=>el[id].setAttribute('transform',v),rotate=(id,a)=>set(id,`rotate(${a})`);
+// One continuous skin curve per limb: no independently rotating cut-out pieces.
+const rigSpec={upperArm:24,forearm:23,thigh:26,shin:27,armWidth:18,legWidth:19,stepPeriod:1.05,blendRate:9};
+const rigs={};
+for(const id of ['armL','armR','legL','legR']){
+ const arm=id.startsWith('arm'),side=id.endsWith('L')?-1:1;
+ el[id].innerHTML=`<path class="skin" fill="none" stroke="${arm?'#f3dfa6':'#eddaa4'}" stroke-width="${arm?rigSpec.armWidth:rigSpec.legWidth}" stroke-linecap="round" stroke-linejoin="round"/><g class="tip"><ellipse rx="${arm?11:15}" ry="${arm?10:9}" cx="${arm?0:side*4}" fill="#fff0c7"/>${arm?`<ellipse cx="${-side*6}" cy="-5" rx="5" ry="6" fill="#fff0c7"/>`:''}</g>`;
+ rigs[id]={skin:el[id].querySelector('.skin'),tip:el[id].querySelector('.tip')};
+}
+function skin(id,joint,end,tipAngle){
+ const {skin,tip}=rigs[id];el[id].removeAttribute('transform');
+ // Cubic tangent passes through the elbow/knee region with no visible hinge seam.
+ skin.setAttribute('d',`M0 0 C${joint.x*.72} ${joint.y*.72} ${joint.x} ${joint.y} ${(joint.x+end.x)*.5} ${(joint.y+end.y)*.5} Q${end.x} ${end.y} ${end.x} ${end.y}`);
+ tip.setAttribute('transform',`translate(${end.x} ${end.y}) rotate(${tipAngle})`);
+}
+function arm(id,shoulder,bend){const r=Math.PI/180,a=shoulder*r,b=(shoulder+bend)*r,j={x:Math.sin(a)*rigSpec.upperArm,y:Math.cos(a)*rigSpec.upperArm},e={x:j.x+Math.sin(b)*rigSpec.forearm,y:j.y+Math.cos(b)*rigSpec.forearm};skin(id,j,e,-(shoulder+bend)*.6)}
+function leg(id,x,y,roll){const len=Math.hypot(x,y),d=Math.min(rigSpec.thigh+rigSpec.shin-.5,Math.max(8,len)),ux=x/len,uy=y/len,h=(rigSpec.thigh**2-rigSpec.shin**2+d*d)/(2*d),off=Math.sqrt(Math.max(0,rigSpec.thigh**2-h*h));skin(id,{x:ux*h-uy*off,y:uy*h+ux*off},{x:ux*d,y:uy*d},roll)}
 function render(dt){const t=reduced.matches?.35:time, p=t*Math.PI*2, s=Math.sin(p*1.6),c=Math.cos(p*1.6);let a={y:-3*Math.sin(p*.55),angle:0,sx:1,sy:1,ll:0,lr:0,fl:0,fr:0,al:-5,ar:5,hl:0,hr:0,leaf:3*Math.sin(p*.75),joy:0};
-if(mode===0){a={...a,y:-10-Math.abs(s)*13,angle:-4+3*s,sx:1.02-Math.abs(s)*.04,sy:.97+Math.abs(s)*.07,ll:42*s,lr:-42*s,fl:Math.max(0,-s)*-48,fr:Math.max(0,s)*45,al:-35*s,ar:35*s,hl:-22-15*c,hr:20+15*c,leaf:9*Math.sin(p*1.6-.7)}}
+if(mode===0){const stride=p/rigSpec.stepPeriod,bounce=(1-Math.cos(stride*2))*.5;a={...a,y:-4-bounce*7,angle:-2+1.6*Math.sin(stride),sx:1.015-bounce*.025,sy:.985+bounce*.03,al:-22-24*Math.sin(stride),ar:22+24*Math.sin(stride),hl:-26-10*Math.sin(stride-.65),hr:26+10*Math.sin(stride-.65),leaf:5*Math.sin(stride*2-.8)}}
 if(mode===1){const w=(t%4)/4,lift=Math.sin(Math.min(1,Math.max(0,(w-.12)/.18))*Math.PI/2)*(w>.78?Math.max(0,(1-w)/.22):1);a={...a,angle:3*Math.sin(p*.25),ar:-145*lift,hr:lift*(18+24*Math.sin(p*2.8)),al:8,leaf:6*Math.sin(p*.7-.4)}}
 if(mode===2||mode===3){const cycle=mode===2?2.5:1.65,u=t%cycle/cycle,air=u>.2&&u<.72?Math.sin((u-.2)/.52*Math.PI):0,prep=u<.2?Math.sin(u/.2*Math.PI):0,land=u>.72?Math.sin((u-.72)/.28*Math.PI)*Math.exp(-(u-.72)*9):0;a={...a,y:-air*(mode===2?68:45)+prep*9+land*8,sx:1+prep*.12+land*.12-air*.05,sy:1-prep*.12-land*.12+air*.07,ll:-air*23,lr:air*30,fl:-air*22,fr:air*20,al:air*135,ar:-air*145,hl:air*15,hr:-air*18,angle:mode===3?4*Math.sin(p):air*-5,leaf:prep*-12+air*12-land*20,joy:mode===3?1:air};}
-for(const k in a)pose[k]=pose[k]===undefined?a[k]:pose[k]+(a[k]-pose[k])*(reduced.matches?1:Math.min(1,dt*14));const v=pose;
+const stride=p/rigSpec.stepPeriod;
+for(const [side,phase,hip] of [['L',0,292],['R',Math.PI,295]]){const q=stride+phase,flight=Math.pow((1+Math.sin(q))*.5,3);a['x'+side]=mode===0?22*Math.cos(q):side==='L'?-4:7;a['y'+side]=mode===0?(343-hip-a.y)/a.sy-19*flight:mode===1?(343-hip-a.y)/a.sy:43-12*Math.max(0,-a.y/68);a['roll'+side]=mode===0?-14*Math.sin(q-.6):0;}
+for(const k in a)pose[k]=pose[k]===undefined?a[k]:pose[k]+(a[k]-pose[k])*(reduced.matches?1:1-Math.exp(-dt*rigSpec.blendRate));const v=pose;
 set('body',`translate(250 ${280+v.y}) rotate(${v.angle}) scale(${v.sx} ${v.sy}) translate(-250 -280)`);el.shadow.setAttribute('rx',78+v.y*.45);el.shadow.setAttribute('opacity',Math.max(.06,.17+v.y*.0016));
-[['legL','ll'],['legR','lr'],['footL','fl'],['footR','fr'],['armL','al'],['armR','ar'],['handL','hl'],['handR','hr'],['sprout','leaf']].forEach(([id,k])=>rotate(id,v[k]));rotate('leafL',Math.sin(p*.9-.7)*4);rotate('leafR',Math.sin(p*1.1-1.2)*5);
+arm('armL',-30-v.al*.65,v.hl-12);arm('armR',30-v.ar*.65,v.hr+12);
+leg('legL',v.xL,v.yL,v.rollL);leg('legR',v.xR,v.yR,v.rollR);
+rotate('sprout',v.leaf);rotate('leafL',Math.sin(p*.9-.7)*4);rotate('leafR',Math.sin(p*1.1-1.2)*5);
 set('face',`translate(${mode===1?gaze.x:Math.sin(p*.2)} ${mode===1?gaze.y:0})`);const blink=t%4.7>4.48?Math.max(.07,Math.abs((t%4.7-4.59)/.11)):1;document.querySelectorAll('.eye').forEach(e=>e.setAttribute('transform',`scale(1 ${blink})`));el.eyes.style.opacity=v.joy>.7?0:1;el.happy.style.opacity=v.joy>.7?1:0;el.mouth.style.opacity=v.joy>.4?0:1;el.openMouth.style.opacity=v.joy>.4?1:0;
 particles.forEach((n,i)=>{let x,y,opacity=0,angle=0;if(mode===3){const q=(t*.53+i/20)%1,theta=i*2.399;x=250+Math.cos(theta)*(35+q*165);y=240-q*230+q*q*280;opacity=Math.sin(q*Math.PI)*.85;angle=q*340+i*37}else if(mode===0&&i<6){const q=(t*1.9+i/6)%1;x=270+q*115;y=342-Math.sin(q*Math.PI)*12;opacity=(1-q)*.22;angle=-12}n.setAttribute('transform',`translate(${x||0} ${y||0}) rotate(${angle})`);n.setAttribute('opacity',opacity)});
 }
 function frame(now){const dt=Math.min(.04,(now-last)/1000||.016);last=now;if(!paused&&!document.hidden){if(!reduced.matches)time+=dt*speed;render(dt)}requestAnimationFrame(frame)}render(.016);requestAnimationFrame(frame);
-document.querySelectorAll('.option').forEach(b=>b.addEventListener('click',()=>render(1)));
+document.querySelectorAll('.option').forEach(b=>b.addEventListener('click',()=>{if(paused||reduced.matches)render(1)}));
 reduced.addEventListener('change',()=>{render(1);$('#status').textContent=reduced.matches?'Movimento reduzido':paused?'Pausado':'Em movimento'});if(reduced.matches)$('#status').textContent='Movimento reduzido';
 </script></body></html>
